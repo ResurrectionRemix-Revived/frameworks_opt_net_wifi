@@ -244,12 +244,13 @@ public class WifiConfigManagerTest {
         // static mocking
         mSession = ExtendedMockito.mockitoSession()
                 .mockStatic(WifiConfigStore.class, withSettings().lenient())
+                .spyStatic(WifiConfigurationUtil.class)
                 .strictness(Strictness.LENIENT)
                 .startMocking();
         when(WifiConfigStore.createUserFiles(anyInt(), anyBoolean())).thenReturn(mock(List.class));
         when(mTelephonyManager.createForSubscriptionId(anyInt())).thenReturn(mDataTelephonyManager);
-        verify(mDeviceConfigFacade).addOnPropertiesChangedListener(any(),
-                mOnPropertiesChangedListenerCaptor.capture());
+        when(WifiConfigurationUtil.calculatePersistentMacForConfiguration(any(), any()))
+                .thenReturn(TEST_RANDOMIZED_MAC);
     }
 
     /**
@@ -308,7 +309,8 @@ public class WifiConfigManagerTest {
      */
     @Test
     public void testRandomizedMacIsGeneratedEvenIfKeyStoreFails() {
-        when(mMacAddressUtil.calculatePersistentMacForConfiguration(any(), any())).thenReturn(null);
+        when(WifiConfigurationUtil.calculatePersistentMacForConfiguration(
+                any(), any())).thenReturn(null);
 
         // Try adding a network.
         WifiConfiguration openNetwork = WifiConfigurationTestUtil.createOpenNetwork();
@@ -318,11 +320,8 @@ public class WifiConfigManagerTest {
         List<WifiConfiguration> retrievedNetworks =
                 mWifiConfigManager.getConfiguredNetworksWithPasswords();
 
-        // Verify that we have attempted to generate the MAC address twice (1 retry)
-        verify(mMacAddressUtil, times(2)).calculatePersistentMacForConfiguration(any(), any());
-        assertEquals(1, retrievedNetworks.size());
-
         // Verify that despite KeyStore returning null, we are still getting a valid MAC address.
+        assertEquals(1, retrievedNetworks.size());
         assertNotEquals(WifiInfo.DEFAULT_MAC_ADDRESS,
                 retrievedNetworks.get(0).getRandomizedMacAddress().toString());
     }
